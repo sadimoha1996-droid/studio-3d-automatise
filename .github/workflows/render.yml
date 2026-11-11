@@ -10,7 +10,7 @@ permissions:
 jobs:
   render:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
 
     steps:
       - name: Checkout project
@@ -18,29 +18,35 @@ jobs:
 
       - name: Install Blender and FFmpeg
         run: |
-          sudo apt-get update
-          sudo apt-get install -y blender ffmpeg
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 install -y blender ffmpeg
 
       - name: Render 3D animation
         run: |
-          blender -b -t 2 --python scene.py
+          blender -b -t 2 \
+            --python scene.py \
+            --python-expr "import bpy; bpy.ops.wm.save_as_mainfile(filepath='/tmp/prototype.blend')" \
+            -o /tmp/frame_ \
+            -F PNG \
+            -a
 
       - name: Assemble MP4
         run: |
           ffmpeg -y \
             -framerate 12 \
+            -start_number 1 \
             -i /tmp/frame_%04d.png \
             -c:v libx264 \
             -pix_fmt yuv420p \
             -movflags +faststart \
-            prototype.mp4
+            /tmp/prototype.mp4
 
       - name: Upload video and Blender project
         uses: actions/upload-artifact@v4
         with:
           name: prototype-3d
           path: |
-            prototype.mp4
+            /tmp/prototype.mp4
             /tmp/prototype.blend
           if-no-files-found: error
           retention-days: 3
